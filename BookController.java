@@ -1,82 +1,67 @@
-package com.example.library.controller;
-
-import com.example.library.model.Book;
-import com.example.library.repository.BookRepository;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+package com.example.library;
 
 import java.util.List;
+import java.util.Optional;
+
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/books")
 public class BookController {
-    private final BookRepository repository;
 
-    public BookController(BookRepository repository) {
-        this.repository = repository;
+    private final BookRepository repo;
+
+    public BookController(BookRepository repo) {
+        this.repo = repo;
     }
 
-    // Add a book
     @PostMapping
-    public ResponseEntity<?> addBook(@RequestBody Book book) {
-        if (book.getId() == null || book.getTitle() == null
-                || book.getAuthor() == null || book.getCategory() == null
-                || book.getAvailableCopies() == null || book.getAvailableCopies() < 0) {
-            return ResponseEntity.badRequest()
-                    .body("All fields are required; copies cannot be negative.");
+    public ResponseEntity<Book> addBook(@RequestBody Book book) {
+        if (repo.existsById(book.getId())) {
+            return ResponseEntity.status(409).build();
         }
-        if (repository.findById(book.getId()).isPresent()) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("A book with this ID already exists.");
-        }
-        repository.save(book);
-        return ResponseEntity.status(HttpStatus.CREATED).body(book);
+        return ResponseEntity.status(201).body(repo.save(book));
     }
 
-    // Retrieve all books
     @GetMapping
     public List<Book> getAllBooks() {
-        return repository.findAll();
+        return repo.findAll();
     }
 
-    // Retrieve one book by ID
     @GetMapping("/{id}")
-    public ResponseEntity<?> getBookById(@PathVariable int id) {
-        return repository.findById(id)
-                .<ResponseEntity<?>>map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body("Book not found with ID: " + id));
+    public ResponseEntity<Book> getBook(@PathVariable Integer id) {
+        return repo.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
-    // Update book details
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateBook(@PathVariable int id,
-                                        @RequestBody Book book) {
-        if (book.getTitle() == null || book.getAuthor() == null
-                || book.getCategory() == null
-                || book.getAvailableCopies() == null
-                || book.getAvailableCopies() < 0) {
-            return ResponseEntity.badRequest()
-                    .body("Valid title, author, category and copies are required.");
-        }
-        if (repository.findById(id).isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Book not found with ID: " + id);
-        }
-        book.setId(id);
-        repository.update(id, book);
-        return ResponseEntity.ok(repository.findById(id).get());
+    public ResponseEntity<Book> updateBook(
+            @PathVariable Integer id,
+            @RequestBody Book updated) {
+
+        Optional<Book> result = repo.findById(id);
+
+        if (result.isEmpty())
+            return ResponseEntity.notFound().build();
+
+        Book book = result.get();
+        book.setTitle(updated.getTitle());
+        book.setAuthor(updated.getAuthor());
+        book.setCategory(updated.getCategory());
+        book.setAvailableCopies(updated.getAvailableCopies());
+
+        return ResponseEntity.ok(repo.save(book));
     }
 
-    // Delete book by ID
     @DeleteMapping("/{id}")
-    public ResponseEntity<String> deleteBook(@PathVariable int id) {
-        int rows = repository.delete(id);
-        if (rows > 0) {
-            return ResponseEntity.ok("Book deleted successfully.");
-        }
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body("Book not found with ID: " + id);
+    public ResponseEntity<String> deleteBook(@PathVariable Integer id) {
+
+        if (!repo.existsById(id))
+            return ResponseEntity.status(404).body("Book not found");
+
+        repo.deleteById(id);
+        return ResponseEntity.ok("Book deleted successfully");
     }
 }
