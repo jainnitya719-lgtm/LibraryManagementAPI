@@ -1,13 +1,18 @@
-package com.example.library.model;
+package com.example.library;
 
+import jakarta.persistence.*;
+
+@Entity
 public class Book {
+    @Id
     private Integer id;
+
     private String title;
     private String author;
     private String category;
     private Integer availableCopies;
 
-    public Book() { }
+    public Book() {}
 
     public Book(Integer id, String title, String author,
                 String category, Integer availableCopies) {
